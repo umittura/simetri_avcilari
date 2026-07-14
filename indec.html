@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Geometrik Şekillerde Simetri Atölyesi</title>
+    <!-- p5.js Kütüphanelerini Yüklüyoruz -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/addons/p5.sound.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #f8f9fa;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Trebuchet MS', sans-serif;
+            overflow: hidden;
+        }
+        #canvas-container {
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+
+    <script>
+        // --- RENK PALETİ ---
+        let ARKAPLAN, KOYU_GRI, MAVI, TURUNCU, KIRMIZI, YESIL, BEYAZ, GRI_ACIK, GRI_GRID;
+        
+        let aktifModul = 2; // Doğrudan çizim modülünden başlasın
+        let tab1, tab2, tab3, tab4;
+        let alkisSesi;
+        let sesYuklendi = false;
+        let sesCalindi = false;
+
+        // --- MODÜL 1 DEĞİŞKENLERİ ---
+        let m1Sekil = "kare";
+        let m1Dogrular = {
+            "dikey": { aktif: false, rect: [485, 290, 30, 260] },
+            "yatay": { aktif: false, rect: [320, 405, 360, 30] },
+            "kosegen1": { aktif: false, rect: [300, 280, 40, 40] },
+            "kosegen2": { aktif: false, rect: [660, 280, 40, 40] }
+        };
+
+        // --- MODÜL 2 DEĞİŞKENLERİ ---
+        let m2Sekil = "kare", m2Yon = "dikey", m2Secenekler = [0, 1, 2], m2Secilen = null;
+        let m2DurumMesaji = "Katlandığında üst üste gelen TAM EŞ olan parçayı seçin.";
+        let m2MesajRenk;
+        let m2SecenekRectleri = [];
+
+        // --- MODÜL 3 DEĞİŞKENLERİ ---
+        const gridBoyut = 8;
+        const hucreBoyutu = 40;
+        const gridSolX = 200, gridUstY = 220;
+        let m3SimetriEkseni = "dikey";
+        let gridVerisi = [];
+        let m3DurumMesaji = "Analiz: Simetri doğrusuna olan mesafeleri sayarak diğer yarıyı boya!";
+        let m3MesajRenk;
+        let m3Tamamlandi = false;
+        let m3AktifOrnekIndex = 0;
+        const m3OrnekIsimleri = ["Kelebek", "Elma", "Robot", "Araba", "Ev", "Çam Ağacı", "Kalp", "Uçak", "Lale Çiçeği", "Kedi"];
+
+        // --- KONFETİ SİSTEMİ ---
+        let konfetiler = [];
+
+        function preload() {
+            // Alkış sesini tarayıcı uyumluluğu için yüklüyoruz
+            soundFormats('mp3');
+            alkisSesi = loadSound('alkis', 
+                () => { sesYuklendi = true; },
+                () => { console.log("Ses yüklenemedi veya izin verilmedi."); }
+            );
+        }
+
+        function setup() {
+            let canvas = createCanvas(1000, 740);
+            canvas.parent('canvas-container');
+            
+            // Renk Tanımlamaları
+            ARKAPLAN = color(248, 249, 250); KOYU_GRI = color(33, 37, 41);
+            MAVI = color(9, 132, 227); TURUNCU = color(225, 112, 85);
+            KIRMIZI = color(214, 48, 49); YESIL = color(46, 204, 113);
+            BEYAZ = color(255, 255, 255); GRI_ACIK = color(220, 224, 230);
+            GRI_GRID = color(200, 200, 200); m2MesajRenk = KOYU_GRI; m3MesajRenk = KOYU_GRI;
+
+            // Sekme Alanları
+            tab1 = { x: 15, y: 80, w: 235, h: 45 }; tab2 = { x: 260, y: 80, w: 235, h: 45 };
+            tab3 = { x: 505, y: 80, w: 235, h: 45 }; tab4 = { x: 750, y: 80, w: 235, h: 45 };
+
+            m2YeniSoru();
+            m3OrnekYukle();
+        }
+
+        function draw() {
+            background(ARKAPLAN);
+            
+            // Başlık
+            fill(KOYU_GRI); noStroke(); textAlign(LEFT, TOP); textSize(24); textStyle(BOLD);
+            text("GEOMETRİK ŞEKİLLERDE SİMETRİ LABORATUVARI", 30, 20);
+
+            // Sekme Butonlarını Çiz
+            drawTab(tab1, "1. Simetri Ekseni Bul", aktifModul === 1);
+            drawTab(tab2, "2. Eş Parçayı Seç (Oyun)", aktifModul === 2);
+            drawTab(tab3, "3. Kendin Çiz & Tamamla", aktifModul === 3);
+            drawTab(tab4, "4. Dairede Sonsuz Simetri", aktifModul === 4);
+
+            if (aktifModul === 1) drawMod1();
+            else if (aktifModul === 2) drawMod2();
+            else if (aktifModul === 3) drawMod3();
+            else if (aktifModul === 4) drawMod4();
+        }
+
+        function drawTab(tab, label, isSelected) {
+            fill(isSelected ? MAVI : GRI_ACIK); stroke(KOYU_GRI); strokeWeight(1);
+            rect(tab.x, tab.y, tab.w, tab.h, 5);
+            fill(isSelected ? BEYAZ : KOYU_GRI); noStroke(); textAlign(CENTER, CENTER); textSize(14); textStyle(NORMAL);
+            text(label, tab.x + tab.w/2, tab.y + tab.h/2);
+        }
+
+        // ==========================================
+        // MODÜL 1: SİMETRİ EKSENİ BUL
+        // ==========================================
+        function drawMod1() {
+            // Şekil Seçme Butonları
+            fill(m1Sekil === "kare" ? MAVI : GRI_ACIK); rect(50, 160, 120, 40, 5);
+            fill(m1Sekil === "dikdortgen" ? MAVI : GRI_ACIK); rect(180, 160, 150, 40, 5);
+            fill(m1Sekil === "kare" ? BEYAZ : KOYU_GRI); textStyle(BOLD); text("Kare", 110, 180);
+            fill(m1Sekil === "dikdortgen" ? BEYAZ : KOYU_GRI); text("Dikdörtgen", 255, 180);
+
+            fill(KOYU_GRI); noStroke(); textStyle(NORMAL); textAlign(LEFT); text("Görev: Şeklin üzerine tıklayarak tüm geçerli simetri doğrularını aktif edin.", 50, 230);
+
+            let cx = 500, cy = 420;
+            let w = m1Sekil === "kare" ? 240 : 360;
+            let h = m1Sekil === "kare" ? 240 : 200;
+
+            // Arka Plan Renklendirmeleri (Aynalama efekti)
+            if (m1Dogrular["dikey"].aktif) {
+                fill(MAVI); rect(cx - w/2, cy - h/2, w/2, h);
+                fill(TURUNCU); rect(cx, cy - h/2, w/2, h);
+            } else if (m1Dogrular["yatay"].aktif) {
+                fill(MAVI); rect(cx - w/2, cy - h/2, w, h/2);
+                fill(TURUNCU); rect(cx - w/2, cy, w, h/2);
+            } else {
+                fill(BEYAZ); rect(cx - w/2, cy - h/2, w, h);
+            }
+            stroke(KOYU_GRI); strokeWeight(3); noFill(); rect(cx - w/2, cy - h/2, w, h);
+
+            // Çizgiler
+            strokeWeight(4);
+            if (m1Dogrular["dikey"].aktif) { stroke(KIRMIZI); line(cx, cy - h/2 - 30, cx, cy + h/2 + 30); }
+            if (m1Dogrular["yatay"].aktif) { stroke(KIRMIZI); line(cx - w/2 - 30, cy, cx + w/2 + 30, cy); }
+            
+            if (m1Sekil === "kare") {
+                if (m1Dogrular["kosegen1"].aktif) { stroke(KIRMIZI); line(cx - w/2 - 30, cy - h/2 - 30, cx + w/2 + 30, cy + h/2 + 30); }
+                if (m1Dogrular["kosegen2"].aktif) { stroke(KIRMIZI); line(cx + w/2 + 30, cy - h/2 - 30, cx - w/2 - 30, cy + h/2 + 30); }
+                fill(GRI_ACIK); stroke(KOYU_GRI); strokeWeight(1);
+                circle(cx - w/2, cy - h/2, 16); circle(cx + w/2, cy - h/2, 16);
+            }
+            fill(GRI_ACIK); stroke(KOYU_GRI); strokeWeight(1);
+            circle(cx, cy - h/2, 16); circle(cx - w/2, cy, 16);
+        }
+
+        // ==========================================
+        // MODÜL 2: EŞ PARÇAYI SEÇ (ŞIKLI OYUN)
+        // ==========================================
+        function drawMod2() {
+            fill(m2MesajRenk); noStroke(); textStyle(BOLD); textAlign(LEFT); text(m2DurumMesaji, 50, 160);
+            
+            let cx = 350, cy = 320;
+            let w = m2Sekil === "kare" ? 200 : 260;
+            let h = m2Sekil === "kare" ? 200 : 160;
+
+            fill(BEYAZ); stroke(KOYU_GRI); strokeWeight(2); rect(100, 190, 500, 260, 8);
+
+            let dogruSecildi = (m2Secilen !== null && m2Secenekler[m2Secilen] === 0);
+
+            if (m2Yon === "dikey") {
+                fill(MAVI); stroke(KOYU_GRI); strokeWeight(3); rect(cx - w/2, cy - h/2, w/2, h);
+                if (dogruSecildi) { fill(TURUNCU); rect(cx, cy - h/2, w/2, h); }
+                stroke(KIRMIZI); strokeWeight(4); line(cx, cy - h/2 - 20, cx, cy + h/2 + 20);
+            } else {
+                fill(MAVI); stroke(KOYU_GRI); strokeWeight(3); rect(cx - w/2, cy - h/2, w, h/2);
+                if (dogruSecildi) { fill(TURUNCU); rect(cx - w/2, cy, w, h/2); }
+                stroke(KIRMIZI); strokeWeight(4); line(cx - w/2 - 20, cy, cx + w/2 + 20, cy);
+            }
+
+            // Şıkları Çiz
+            let sw = m2Sekil === "kare" ? 50 : 70;
+            let sh = m2Sekil === "kare" ? 50 : 42;
+
+            for (let i = 0; i < 3; i++) {
+                let r = m2SecenekRectleri[i];
+                let bg = BEYAZ;
+                if (m2Secilen !== null) {
+                    if (m2Secenekler[i] === 0) bg = color(212, 239, 223);
+                    elif (m2Secilen === i) bg = color(242, 215, 213);
+                }
+                fill(bg); stroke(KOYU_GRI); strokeWeight(2); rect(r.x, r.y, r.w, r.h, 6);
+
+                let harf = ["A", "B", "C"][i];
+                fill(KOYU_GRI); noStroke(); textAlign(LEFT, CENTER); textStyle(BOLD); text(harf + " Seçeneği", r.x + 15, r.y + r.h/2);
+
+                let scx = r.x + 210, scy = r.y + r.h/2;
+                fill(TURUNCU); stroke(KOYU_GRI); strokeWeight(2);
+                if (m2Yon === "dikey") {
+                    if (m2Secenekler[i] === 0) rect(scx - sw/4, scy - sh/2, sw/2, sh);
+                    else if (m2Secenekler[i] === 1) rect(scx - sh/2, scy - sw/4, sh, sw/2);
+                    else if (m2Secenekler[i] === 2) rect(scx - sw/6, scy - sh/3, sw/3, sh/1.5);
+                } else {
+                    if (m2Secenekler[i] === 0) rect(scx - sw/2, scy - sh/4, sw, sh/2);
+                    else if (m2Secenekler[i] === 1) rect(scx - sh/4, scy - sw/2, sh/2, sw);
+                    else if (m2Secenekler[i] === 2) rect(scx - sw/3, scy - sh/6, sw/1.5, sh/3);
+                }
+            }
+
+            if (m2Secilen !== null) {
+                fill(MAVI); rect(m2_btn_yeni.x, m2_btn_yeni.y, m2_btn_yeni.w, m2_btn_yeni.h, 6);
+                fill(BEYAZ); textAlign(CENTER, CENTER); text("Sonraki Örnek", m2_btn_yeni.x + m2_btn_yeni.w/2, m2_btn_yeni.y + m2_btn_yeni.h/2);
+            }
+
+            if (dogruSecildi) yonetKonfeti();
+        }
+
+        function m2YeniSoru() {
+            m2Sekil = random(["kare", "dikdortgen"]); m2Yon = random(["dikey", "yatay"]); m2Secilen = null;
+            m2DurumMesaji = "Katlandığında üst üste gelen TAM EŞ olan parçayı seçin."; m2MesajRenk = KOYU_GRI;
+            konfetiler = []; m2Secenekler = [0, 1, 2]; shuffle(m2Secenekler, true);
+            m2SecenekRectleri = [];
+            for (let i = 0; i < 3; i++) {
+                m2SecenekRectleri.push({ x: 640, y: 190 + i * 85, w: 280, h: 70 });
+            }
+            m2_btn_yeni = { x: 100, y: 470, w: 200, h: 45 };
+        }
+
+        // ==========================================
+        // MODÜL 3: KENDİN ÇİZ & TAMAMLA (10 ŞABLON)
+        // ==========================================
+        function drawMod3() {
+            fill(m3MesajRenk); noStroke(); textStyle(BOLD); textAlign(LEFT); text(m3DurumMesaji, 50, 150);
+
+            // Eksen Butonları
+            fill(m3SimetriEkseni === "dikey" ? MAVI : GRI_ACIK); rect(640, 220, 140, 40, 5);
+            fill(m3SimetriEkseni === "yatay" ? MAVI : GRI_ACIK); rect(790, 220, 140, 40, 5);
+            fill(m3SimetriEkseni === "dikey" ? BEYAZ : KOYU_GRI); textAlign(CENTER, CENTER); text("Dikey Simetri", 710, 240);
+            fill(m3SimetriEkseni === "yatay" ? BEYAZ : KOYU_GRI); text("Yatay Simetri", 860, 240);
+
+            // Grid Çizimi
+            for (let r = 0; r < gridBoyut; r++) {
+                for (let c = 0; c < gridBoyut; c++) {
+                    let x = gridSolX + c * hucreBoyutu;
+                    let y = gridUstY + r * hucreBoyutu;
+                    let durum = gridVerisi[r] ? gridVerisi[r][c] : 0;
+                    
+                    if (durum === 1) fill(MAVI);
+                    else if (durum === 2) fill(TURUNCU);
+                    else fill(BEYAZ);
+                    
+                    stroke(GRI_GRID); strokeWeight(1);
+                    rect(x, y, hucreBoyutu, hucreBoyutu);
+                }
+            }
+
+            // Kırmızı Eksen Çizgisi
+            stroke(KIRMIZI); strokeWeight(4);
+            if (m3SimetriEkseni === "dikey") {
+                let midX = gridSolX + 4 * hucreBoyutu;
+                line(midX, gridUstY - 20, midX, gridUstY + 8 * hucreBoyutu + 20);
+            } else {
+                let midY = gridUstY + 4 * hucreBoyutu;
+                line(gridSolX - 20, midY, gridSolX + 8 * hucreBoyutu + 20, midY);
+            }
+
+            // Diğer Butonlar
+            fill(KIRMIZI); noStroke(); rect(640, 420, 140, 40, 5);
+            fill(BEYAZ); text("Sıfırla", 710, 440);
+
+            fill(m3Tamamlandi ? YESIL : KOYU_GRI); rect(640, 475, 290, 40, 5);
+            fill(BEYAZ); text("➡️ Başka Şablona Geç", 785, 495);
+
+            // Analiz Paneli
+            fill(BEYAZ); stroke(KOYU_GRI); rect(640, 280, 290, 120, 8);
+            fill(KOYU_GRI); noStroke(); textAlign(LEFT); text("🕵️ MANTIKSAL ANALİZ", 655, 305);
+            textSize(13); textStyle(NORMAL);
+            let isim = m3OrnekIsimleri[m3AktifOrnekIndex % 10];
+            text("- Şekil: " + isim + " (" + ((m3AktifOrnekIndex % 10) + 1) + "/10)", 655, 335);
+            text("- Kırmızı doğruya göre kareleri eşle.", 655, 360);
+
+            if (m3Tamamlandi) yonetKonfeti();
+        }
+
+        function m3OrnekYukle() {
+            m3Tamamlandi = false; sesCalindi = false; konfetiler = [];
+            m3DurumMesaji = "Analiz: Simetri doğrusuna olan mesafeleri sayarak diğer yarıyı boya!"; m3MesajRenk = KOYU_GRI;
+            
+            gridVerisi = [];
+            for(let i=0; i<gridBoyut; i++) gridVerisi.push([0,0,0,0,0,0,0,0]);
+
+            let idx = m3AktifOrnekIndex % 10;
+            let dikeySablonlar = [
+                [[0,1,1,0],[1,1,1,1],[1,1,1,1],[0,1,1,0],[0,1,1,1],[1,1,1,1],[0,1,1,0],[0,0,0,0]], // Kelebek
+                [[0,0,1,0],[0,1,1,0],[1,1,1,1],[1,1,1,1],[1,1,1,1],[1,1,1,1],[0,1,1,0],[0,0,0,0]], // Elma
+                [[0,1,1,1],[0,1,0,1],[0,1,1,1],[0,0,1,1],[1,1,1,1],[1,1,1,1],[1,0,1,1],[1,0,0,0]], // Robot
+                [[0,0,0,0],[0,0,1,1],[0,1,1,1],[1,1,1,1],[1,1,1,1],[1,0,1,1],[0,1,1,0],[0,0,0,0]], // Araba
+                [[0,0,0,1],[0,0,1,1],[0,1,1,1],[1,1,1,1],[0,1,1,1],[0,1,0,1],[0,1,1,1],[0,1,1,1]], // Ev
+                [[0,0,0,1],[0,0,1,1],[0,1,1,1],[0,0,1,1],[0,1,1,1],[1,1,1,1],[0,0,0,1],[0,0,0,1]], // Çam Ağacı
+                [[0,1,1,0],[1,1,1,1],[1,1,1,1],[0,1,1,1],[0,0,1,1],[0,0,0,1],[0,0,0,0],[0,0,0,0]], // Kalp
+                [[0,0,0,1],[0,0,0,1],[0,0,1,1],[1,1,1,1],[0,0,1,1],[0,0,1,1],[0,1,1,1],[0,0,0,0]], // Uçak
+                [[0,1,0,1],[0,1,1,1],[0,1,1,1],[0,0,1,1],[0,1,1,0],[0,0,1,1],[0,0,1,0],[0,0,1,0]], // Lale
+                [[0,1,0,0],[0,1,1,1],[1,1,1,1],[1,0,1,1],[1,1,1,1],[0,1,1,1],[0,0,1,1],[0,0,0,0]]  // Kedi
+            ];
+
+            let yataySablonlar = [
+                [[1,1,0,0,0,0,1,1],[1,1,1,0,0,1,1,1],[0,1,1,1,1,1,1,0],[0,0,1,1,1,1,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0]], // Kelebek
+                [[0,0,0,1,1,0,0,0],[0,1,1,1,1,1,1,0],[1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0]], // Elma
+                [[0,1,1,0,0,1,1,0],[0,1,1,1,1,1,1,0],[0,1,0,1,1,0,1,0],[0,1,1,1,1,1,1,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0]], // Robot
+                [[0,0,1,1,1,1,0,0],[0,1,1,1,1,1,1,0],[1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0]], // Araba
+                [[0,0,0,1,1,0,0,0],[0,0,1,1,1,1,0,0],[0,1,1,1,1,1,1,0],[1,1,1,1,1,1,1,1],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0]], // Ev
+                [[0,0,0,1,1,0,0,0],[0,0,1,1,1,1,0,0],[0,1,1,1,1,1,1,0],[1,1,1,1,1,1,1,1],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0]], // Çam
+                [[0,1,1,0,0,1,1,0],[1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1],[0,1,1,1,1,1,1,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0]], // Kalp
+                [[0,0,0,1,1,0,0,0],[1,1,1,1,1,1,1,1],[0,0,0,1,1,0,0,0],[0,0,1,1,1,1,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0]], // Uçak
+                [[1,0,0,0,0,0,0,1],[1,1,0,0,0,0,1,1],[0,1,1,1,1,1,1,0],[0,0,1,1,1,1,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0]], // Lale
+                [[1,0,0,0,0,0,0,1],[1,1,0,0,0,0,1,1],[1,1,1,1,1,1,1,1],[0,1,1,1,1,1,1,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0]]  // Kedi
+            ];
+
+            if (m3SimetriEkseni === "dikey") {
+                let sablon = dikeySablonlar[idx];
+                for(let r=0; r<gridBoyut; r++) { for(let c=0; c<4; c++) gridVerisi[r][c] = sablon[r][c]; }
+            } else {
+                let sablon = yataySablonlar[idx];
+                for(let r=0; r<4; r++) { for(let c=0; c<gridBoyut; c++) gridVerisi[r][c] = sablon[r][c]; }
+            }
+        }
+
+        function m3GridKontrol() {
+            let hata = false, eksik = false;
+            if (m3SimetriEkseni === "dikey") {
+                for(let r=0; r<gridBoyut; r++) {
+                    for(let c=0; c<4; c++) {
+                        if (gridVerisi[r][c] === 1 && gridVerisi[r][7-c] !== 2) eksik = true;
+                        if (gridVerisi[r][c] === 0 && gridVerisi[r][7-c] === 2) hata = true;
+                    }
+                }
+            } else {
+                for(let r=0; r<4; r++) {
+                    for(let c=0; c<gridBoyut; c++) {
+                        if (gridVerisi[r][c] === 1 && gridVerisi[7-r][c] !== 2) eksik = true;
+                        if (gridVerisi[r][c] === 0 && gridVerisi[7-r][c] === 2) hata = true;
+                    }
+                }
+            }
+            if (hata) { m3DurumMesaji = "İnceleme: Bazı kareler simetri eksenine eşit mesafede değil!"; m3MesajRenk = KIRMIZI; }
+            else if (eksik) { m3DurumMesaji = "İnceleme: Şeklin tüm eş parçaları henüz tamamlanmadı."; m3MesajRenk = MAVI; }
+            else {
+                m3DurumMesaji = "TEBRİKLER! Şekli simetri doğrusuna göre kusursuz tamamladın! 🌟"; m3MesajRenk = YESIL;
+                m3Tamamlandi = true;
+                if (sesYuklendi && !sesCalindi) { alkisSesi.play(); sesCalindi = true; }
+            }
+        }
+
+        // ==========================================
+        // MODÜL 4: DAİREDE SONSUZ SİMETRİ
+        // ==========================================
+        function drawMod4() {
+            fill(KOYU_GRI); noStroke(); textStyle(BOLD); textAlign(LEFT); text("Dairenin üzerine tıklayarak yeni simetri doğruları çizin.", 50, 150);
+            text("Çizilen Simetri Doğrusu Sayısı: " + m4_cizilen_acilar.length, 50, 185);
+
+            let cx = 500, cy = 380, r = 160;
+            fill(BEYAZ); stroke(KOYU_GRI); strokeWeight(3); circle(cx, cy, r*2);
+            fill(KIRMIZI); circle(cx, cy, 12); // Merkez
+
+            stroke(KIRMIZI); strokeWeight(3);
+            for (let aci of m4_cizilen_acilar) {
+                let x1 = cx + (r + 30) * cos(aci); let y1 = cy + (r + 30) * sin(aci);
+                let x2 = cx - (r + 30) * cos(aci); let y2 = cy - (r + 30) * sin(aci);
+                line(x1, y1, x2, y2);
+            }
+
+            fill(KIRMIZI); noStroke(); rect(50, 640, 160, 40, 5);
+            fill(BEYAZ); textAlign(CENTER, CENTER); text("Tümünü Temizle", 130, 660);
+        }
+
+        // ==========================================
+        // FARE ETKİLEŞİMLERİ (CLICK MANTIKLARI)
+        // ==========================================
+        function mousePressed() {
+            // Sekme geçişleri
+            if (mouseIn(tab1)) { aktifModul = 1; konfetiler=[]; }
+            if (mouseIn(tab2)) { aktifModul = 2; m2YeniSoru(); }
+            if (mouseIn(tab3)) { aktifModul = 3; m3OrnekYukle(); }
+            if (mouseIn(tab4)) { aktifModul = 4; konfetiler=[]; }
+
+            if (aktifModul === 1) {
+                if (mouseX > 50 && mouseX < 170 && mouseY > 160 && mouseY < 200) { m1Sekil = "kare"; m1Sifirla(); }
+                if (mouseX > 180 && mouseX < 330 && mouseY > 160 && mouseY < 200) { m1Sekil = "dikdortgen"; m1Sifirla(); }
+                
+                for (let k in m1Dogrular) {
+                    if (m1Sekil === "dikdortgen" && k.includes("kosegen")) continue;
+                    let r = m1Dogrular[k].rect;
+                    if (mouseX > r[0] && mouseX < r[0]+r[2] && mouseY > r[1] && mouseY < r[1]+r[3]) {
+                        m1Dogrular[k].aktif = !m1Dogrular[k].aktif;
+                    }
+                }
+            }
+            else if (aktifModul === 2) {
+                if (m2Secilen === null) {
+                    for (let i = 0; i < 3; i++) {
+                        let r = m2SecenekRectleri[i];
+                        if (mouseX > r.x && mouseX < r.x + r.w && mouseY > r.y && mouseY < r.y + r.h) {
+                            m2Secilen = i;
+                            if (m2Secenekler[i] === 0) {
+                                m2DurumMesaji = "Doğru! Simetri doğrusu şekli birebir eş iki parçaya ayırır."; m2MesajRenk = YESIL;
+                                if (sesYuklendi) alkisSesi.play();
+                            } else {
+                                m2DurumMesaji = "Hata! Boyut veya yön uyuşmuyor, parçalar tam eş olmalı."; m2MesajRenk = KIRMIZI;
+                            }
+                        }
+                    }
+                } else {
+                    if (mouseX > m2_btn_yeni.x && mouseX < m2_btn_yeni.x + m2_btn_yeni.w && mouseY > m2_btn_yeni.y && mouseY < m2_btn_yeni.y + m2_btn_yeni.h) m2YeniSoru();
+                }
+            }
+            else if (aktifModul === 3) {
+                if (mouseX > 640 && mouseX < 780 && mouseY > 220 && mouseY < 260) { m3SimetriEkseni = "dikey"; m3OrnekYukle(); }
+                if (mouseX > 790 && mouseX < 930 && mouseY > 220 && mouseY < 260) { m3SimetriEkseni = "yatay"; m3OrnekYukle(); }
+                if (mouseX > 640 && mouseX < 780 && mouseY > 420 && mouseY < 460) m3OrnekYukle();
+                if (mouseX > 640 && mouseX < 930 && mouseY > 475 && mouseY < 515) { m3AktifOrnekIndex++; m3OrnekYukle(); }
+
+                let col = floor((mouseX - gridSolX) / hucreBoyutu);
+                let row = floor((mouseY - gridUstY) / hucreBoyutu);
+                if (col >= 0 && col < gridBoyut && row >= 0 && row < gridBoyut) {
+                    if (m3SimetriEkseni === "dikey" && col >= 4) {
+                        gridVerisi[row][col] = gridVerisi[row][col] === 2 ? 0 : 2; m3GridKontrol();
+                    } else if (m3SimetriEkseni === "yatay" && row >= 4) {
+                        gridVerisi[row][col] = gridVerisi[row][col] === 2 ? 0 : 2; m3GridKontrol();
+                    }
+                }
+            }
+            else if (aktifModul === 4) {
+                let cx = 500, cy = 380, r = 160;
+                let d = dist(mouseX, mouseY, cx, cy);
+                if (d <= r && d > 10) {
+                    let aci = atan2(mouseY - cy, mouseX - cx);
+                    m4_cizilen_acilar.push(aci);
+                }
+                if (mouseX > 50 && mouseX < 210 && mouseY > 640 && mouseY < 680) m4_cizilen_acilar = [];
+            }
+        }
+
+        function m1Sifirla() { for(let k in m1Dogrular) m1Dogrular[k].aktif = false; }
+        function mouseIn(tab) { return mouseX > tab.x && mouseX < tab.x + tab.w && mouseY > tab.y && mouseY < tab.y + tab.h; }
+        
+        function yonetKonfeti() {
+            if (konfetiler.length < 100) konfetiler.push(new Konfeti());
+            for (let k of konfetiler) { k.hareket_et(); k.ciz(this); }
+        }
+    </script>
+</body>
+</html>
