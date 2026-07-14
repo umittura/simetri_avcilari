@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <title>Simetri Atölyesi</title>
-    <!-- p5.js Kütüphanelerini Yüklüyoruz -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/addons/p5.sound.min.js"></script>
+    <!-- Sadece ana p5.js kütüphanesini yüklüyoruz, sorun çıkaran sound eklentisini sildik! -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.2/p5.js"></script>
     <style>
         body {
             margin: 0;
@@ -34,17 +33,17 @@
         
         let aktifModul = 2; // Doğrudan çizim modülünden başlasın
         let tab1, tab2, tab3, tab4;
-        let alkisSesi;
-        let sesYuklendi = false;
-        let sesCalindi = false;
+        
+        // Tarayıcının yerel ses motorunu başlatıyoruz (Asla çökmez)
+        let alkisSesi = new Audio('alkis.mp3');
 
         // --- MODÜL 1 DEĞİŞKENLERİ ---
         let m1Sekil = "kare";
         let m1Dogrular = {
             "dikey": { aktif: false, rect: [485, 290, 30, 260] },
             "yatay": { aktif: false, rect: [320, 405, 360, 30] },
-            "kosegen1": { aktif: false, rect: [300, 280, 40, 40] },
-            "kosegen2": { aktif: false, rect: [660, 280, 40, 40] }
+            "kosegen1": { aktif: false, rect: [365, 285, 30, 30] }, 
+            "kosegen2": { aktif: false, rect: [605, 285, 30, 30] }  
         };
 
         // --- MODÜL 2 DEĞİŞKENLERİ ---
@@ -64,18 +63,11 @@
         let m3MesajRenk;
         let m3Tamamlandi = false;
         let m3AktifOrnekIndex = 0;
+        let sesCalindi = false;
         const m3OrnekIsimleri = ["Kelebek", "Elma", "Robot", "Araba", "Ev", "Çam Ağacı", "Kalp", "Uçak", "Lale Çiçeği", "Kedi"];
 
         // --- KONFETİ SİSTEMİ ---
         let konfetiler = [];
-
-        function preload() {
-            soundFormats('mp3');
-            alkisSesi = loadSound('alkis', 
-                () => { sesYuklendi = true; },
-                () => { console.log("Ses yüklenemedi veya izin verilmedi."); }
-            );
-        }
 
         function setup() {
             let canvas = createCanvas(1000, 740);
@@ -133,12 +125,23 @@
             let w = m1Sekil === "kare" ? 240 : 360;
             let h = m1Sekil === "kare" ? 240 : 200;
 
-            if (m1Dogrular["dikey"].aktif) {
+            if (m1Dogrular["dikey"].aktif && m1Dogrular["yatay"].aktif) {
+                fill(MAVI); rect(cx - w/2, cy - h/2, w/2, h/2);
+                fill(TURUNCU); rect(cx, cy - h/2, w/2, h/2);
+                fill(TURUNCU); rect(cx - w/2, cy, w/2, h/2);
+                fill(MAVI); rect(cx, cy, w/2, h/2);
+            } else if (m1Dogrular["dikey"].aktif) {
                 fill(MAVI); rect(cx - w/2, cy - h/2, w/2, h);
                 fill(TURUNCU); rect(cx, cy - h/2, w/2, h);
             } else if (m1Dogrular["yatay"].aktif) {
                 fill(MAVI); rect(cx - w/2, cy - h/2, w, h/2);
                 fill(TURUNCU); rect(cx - w/2, cy, w, h/2);
+            } else if (m1Sekil === "kare" && m1Dogrular["kosegen1"].aktif) {
+                fill(MAVI); triangle(cx - w/2, cy - h/2, cx - w/2, cy + h/2, cx + w/2, cy + h/2);
+                fill(TURUNCU); triangle(cx - w/2, cy - h/2, cx + w/2, cy - h/2, cx + w/2, cy + h/2);
+            } else if (m1Sekil === "kare" && m1Dogrular["kosegen2"].aktif) {
+                fill(MAVI); triangle(cx - w/2, cy - h/2, cx + w/2, cy - h/2, cx - w/2, cy + h/2);
+                fill(TURUNCU); triangle(cx - w/2, cy + h/2, cx + w/2, cy - h/2, cx + w/2, cy + h/2);
             } else {
                 fill(BEYAZ); rect(cx - w/2, cy - h/2, w, h);
             }
@@ -151,11 +154,13 @@
             if (m1Sekil === "kare") {
                 if (m1Dogrular["kosegen1"].aktif) { stroke(KIRMIZI); line(cx - w/2 - 30, cy - h/2 - 30, cx + w/2 + 30, cy + h/2 + 30); }
                 if (m1Dogrular["kosegen2"].aktif) { stroke(KIRMIZI); line(cx + w/2 + 30, cy - h/2 - 30, cx - w/2 - 30, cy + h/2 + 30); }
-                fill(GRI_ACIK); stroke(KOYU_GRI); strokeWeight(1);
-                circle(cx - w/2, cy - h/2, 16); circle(cx + w/2, cy - h/2, 16);
+                
+                fill(GRI_ACIK); stroke(KOYU_GRI); strokeWeight(1.5);
+                circle(cx - w/2, cy - h/2, 20); 
+                circle(cx + w/2, cy - h/2, 20); 
             }
-            fill(GRI_ACIK); stroke(KOYU_GRI); strokeWeight(1);
-            circle(cx, cy - h/2, 16); circle(cx - w/2, cy, 16);
+            fill(GRI_ACIK); stroke(KOYU_GRI); strokeWeight(1.5);
+            circle(cx, cy - h/2, 20); circle(cx - w/2, cy, 20);
         }
 
         // ==========================================
@@ -345,7 +350,10 @@
             else {
                 m3DurumMesaji = "TEBRİKLER! Şekli simetri doğrusuna göre kusursuz tamamladın! 🌟"; m3MesajRenk = YESIL;
                 m3Tamamlandi = true;
-                if (sesYuklendi && !sesCalindi) { alkisSesi.play(); sesCalindi = true; }
+                if (!sesCalindi) {
+                    alkisSesi.play().catch(e => console.log("Tarayıcı etkileşim kısıtlaması nedeniyle ses tetiklenemedi."));
+                    sesCalindi = true;
+                }
             }
         }
 
@@ -401,7 +409,7 @@
                             m2Secilen = i;
                             if (m2Secenekler[i] === 0) {
                                 m2DurumMesaji = "Doğru! Simetri doğrusu şekli birebir eş iki parçaya ayırır."; m2MesajRenk = YESIL;
-                                if (sesYuklendi) alkisSesi.play();
+                                alkisSesi.play().catch(e => {});
                             } else {
                                 m2DurumMesaji = "Hata! Boyut veya yön uyuşmuyor, parçalar tam eş olmalı."; m2MesajRenk = KIRMIZI;
                             }
@@ -446,7 +454,6 @@
             for (let k of konfetiler) { k.hareket_et(); k.ciz(); }
         }
 
-        // Konfeti Sınıfı Tanımı
         class Konfeti {
             constructor() {
                 this.x = random(0, width);
